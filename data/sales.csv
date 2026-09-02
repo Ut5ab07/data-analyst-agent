@@ -1,0 +1,13 @@
+Date,Product,Category,Region,Sales,Quantity,Profit
+2026-01-05,Laptop,Electronics,North,75000,3,12000
+2026-01-08,Mouse,Electronics,South,5000,20,1500
+2026-01-12,Keyboard,Electronics,West,8000,10,2200
+2026-01-15,Laptop,Electronics,West,100000,4,18000
+2026-01-20,Chair,Furniture,North,30000,6,6000
+2026-01-22,Desk,Furniture,South,45000,5,9000
+2026-02-02,Laptop,Electronics,South,125000,5,22000
+2026-02-07,Mouse,Electronics,North,7500,30,2100
+2026-02-11,Chair,Furniture,West,25000,5,5000
+2026-02-18,Desk,Furniture,West,60000,6,12000
+2026-02-21,Keyboard,Electronics,South,12000,15,3500
+2026-02-25,Laptop,Electronics,North,90000,4,16000
