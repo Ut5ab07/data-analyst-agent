@@ -68,5 +68,35 @@ print(code)
 
 result = execute_analysis(df, code)
 
-print("\nAnalysis result:")
-print(result)
+#Asking gemini to explain the result
+
+explanation_prompt = f"""
+You are a data analysis assistant.
+
+The user asked:
+
+{question}
+
+The Python analysis produced this result:
+
+{result}
+
+Explain the result clearly and concisely.
+
+Rules:
+- Directly answer the user's question.
+- Include important numbers.
+- Do not mention Python or Pandas.
+- Do not explain the code.
+- Do not make claims that are not supported by the result.
+"""
+
+
+explanation = client.interactions.create(
+    model="gemini-3.6-flash",
+    input=explanation_prompt
+)
+
+
+print("\nAgent answer:")
+print(explanation.output_text)
