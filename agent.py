@@ -8,8 +8,6 @@ load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
 
-print("API key loaded:", bool(api_key))
-
 client = genai.Client(api_key=api_key)
 
 
@@ -59,18 +57,79 @@ interaction = client.interactions.create(
 
 code = interaction.output_text.strip()
 
-#Displaying the generated code
+#Error Recovery Loop
 
-print("\nGenerated code:")
-print(code)
+MAX_ATTEMPT = 3
 
-#Executing the generated code
+for attempt in range(1, MAX_ATTEMPT + 1):
 
-result = execute_analysis(df, code)
+    print(f"\n Attempt {attempt}")
+    print("Generated code:")
+    print(code)
 
-#Asking gemini to explain the result
+    execution = execute_analysis(df, code)
 
-explanation_prompt = f"""
+    # Success
+    if execution["success"]:
+        result = execution["result"]
+
+        print("\nAnalysis Result:")
+        print(result)
+
+        break
+
+    #Error 
+    print("\nExecution Error:")
+    print(execution["error"])
+
+    if attempt == MAX_ATTEMPT:
+        print("\n The agent could not complete the analysis.")
+
+        break
+
+    # Asking Gemini to fix the code
+    correction_prompt = f"""
+You are debuggin Python Pandas code.
+User question:
+
+{question}
+
+Dataset information:
+{info}
+
+Previous code:
+{code}
+The code produced this error:
+{execution["error"]}
+
+Fix the code so that it correctly answers the user's question.
+Rules:
+- Use Pandas.
+- The DataFrame is available as `df`.
+- Store the final answer in a variable called `result`.
+- Return ONLY the corrected Python code.
+- Do not use print().
+- Do not include markdown.
+- Do not include ```python.
+- Do not explain anything
+"""
+
+
+    correction = client.interactions.create(
+        model="gemini-3.6-flash",
+        input=correction_prompt
+    )
+
+    code = correction.output_text.strip()
+
+
+# -----------------------------
+# Generate final explanation
+# -----------------------------
+
+if execution["success"]:
+
+    explanation_prompt = f"""
 You are a data analysis assistant.
 
 The user asked:
@@ -91,12 +150,10 @@ Rules:
 - Do not make claims that are not supported by the result.
 """
 
+    explanation = client.interactions.create(
+        model="gemini-3.6-flash",
+        input=explanation_prompt
+    )
 
-explanation = client.interactions.create(
-    model="gemini-3.6-flash",
-    input=explanation_prompt
-)
-
-
-print("\nAgent answer:")
-print(explanation.output_text)
+    print("\nAgent answer:")
+    print(explanation.output_text)

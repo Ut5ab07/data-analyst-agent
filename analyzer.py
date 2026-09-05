@@ -18,10 +18,23 @@ def execute_analysis(df, code):
         "pd": pd
     }
 
-    exec(code, {}, local_variables)
+    try:
+        exec(code, {}, local_variables)
 
-    return local_variables.get("result")
+        result = local_variables.get("result")
 
+        return {
+            "success":True,
+            "result": result,
+            "error": None
+        }
+
+    except Exception as e:
+        return {
+            "success": False,
+            "result": None,
+            "error": str(e)
+        }
 
 if __name__ == "__main__":
 
