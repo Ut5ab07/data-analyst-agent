@@ -1,6 +1,8 @@
 from google import genai
+from google.genai import errors as genai_errors
 from dotenv import load_dotenv
 import os
+import re
 
 from analyzer import load_data, get_dataset_info, execute_analysis
 
@@ -11,6 +13,52 @@ load_dotenv()
 api_key = os.getenv("GEMINI_API_KEY")
 
 client = genai.Client(api_key=api_key)
+
+
+def _retry_hint(error):
+    """Extract a retry duration from an SDK error when one is provided."""
+    message = str(error)
+    match = re.search(r"(?:retry(?:[- ]after| in)|try again in)\s*([0-9]+(?:\.[0-9]+)?)\s*s", message, re.IGNORECASE)
+    if match:
+        return f" The API suggests waiting about {match.group(1)} seconds."
+    return ""
+
+
+def _gemini_error_message(error):
+    """Convert an SDK or connection error into a short user-facing message."""
+    status_code = getattr(error, "code", None) or getattr(error, "status_code", None)
+    error_text = str(error).lower()
+
+    if status_code == 429 or "429" in error_text or "rate limit" in error_text or "quota" in error_text:
+        return "Gemini API limit reached. Please wait a little and try again." + _retry_hint(error)
+
+    if isinstance(error, (ConnectionError, TimeoutError)) or "connection" in error_text or "timeout" in error_text:
+        return "Could not connect to Gemini. Check your internet connection and try again."
+
+    if isinstance(error, genai_errors.APIError):
+        return "Gemini API request failed. Please try again."
+
+    return "The Gemini request failed. Please try again."
+
+
+def _request_gemini(prompt):
+    """Make one Gemini request without retrying failed API calls automatically."""
+    try:
+        interaction = client.interactions.create(
+            model="gemini-3.6-flash",
+            input=prompt
+        )
+        return {
+            "success": True,
+            "text": interaction.output_text.strip(),
+            "error": None
+        }
+    except Exception as error:
+        return {
+            "success": False,
+            "text": None,
+            "error": _gemini_error_message(error)
+        }
 
 
 def analyze_question(df, question):
@@ -48,12 +96,16 @@ Rules:
 - Do not explain the code.
 """
 
-    interaction = client.interactions.create(
-        model="gemini-3.6-flash",
-        input=prompt
-    )
+    generation = _request_gemini(prompt)
+    if not generation["success"]:
+        return {
+            "success": False,
+            "answer": generation["error"],
+            "code": "",
+            "error": generation["error"]
+        }
 
-    code = interaction.output_text.strip()
+    code = generation["text"]
 
     # Error recovery loop
     MAX_ATTEMPTS = 3
@@ -111,12 +163,16 @@ Rules:
 - Do not explain anything.
 """
 
-        correction = client.interactions.create(
-            model="gemini-3.6-flash",
-            input=correction_prompt
-        )
+        correction = _request_gemini(correction_prompt)
+        if not correction["success"]:
+            return {
+                "success": False,
+                "answer": correction["error"],
+                "code": code,
+                "error": correction["error"]
+            }
 
-        code = correction.output_text.strip()
+        code = correction["text"]
 
     # Ask Gemini to explain the result
     explanation_prompt = f"""
@@ -140,14 +196,19 @@ Rules:
 - Do not make claims that are not supported by the result.
 """
 
-    explanation = client.interactions.create(
-        model="gemini-3.6-flash",
-        input=explanation_prompt
-    )
+    explanation = _request_gemini(explanation_prompt)
+    if not explanation["success"]:
+        return {
+            "success": True,
+            "answer": "The analysis completed, but Gemini could not generate an explanation.",
+            "result": result,
+            "code": code,
+            "api_error": explanation["error"]
+        }
 
     return {
         "success": True,
-        "answer": explanation.output_text,
+        "answer": explanation["text"],
         "result": result,
         "code": code
     }
