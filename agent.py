@@ -4,6 +4,8 @@ import os
 
 from analyzer import load_data, get_dataset_info, execute_analysis
 
+
+# Load environment variables
 load_dotenv()
 
 api_key = os.getenv("GEMINI_API_KEY")
@@ -11,35 +13,31 @@ api_key = os.getenv("GEMINI_API_KEY")
 client = genai.Client(api_key=api_key)
 
 
-# Loading The Dataset
+def analyze_question(df, question):
+    """
+    Analyze a user's question using Gemini and Pandas.
+    Includes automatic error recovery.
+    """
 
-df=load_data("data/sales.csv")
-print("Dataset loaded successfully!")
+    # Get dataset information
+    info = get_dataset_info(df)
 
-#Getting Dataset Information
+    # Ask Gemini to generate analysis code
+    prompt = f"""
+You are a Python data analysis agent.
 
-info = get_dataset_info(df)
+You are working with a Pandas DataFrame called `df`.
 
-print("\nDataset information:")
-print(info)
-
-
-#Getting User question
-
-question = input("\n What would you like to know about the dataset?:")
-
-#Asking Gemini to generate code 
-
-prompt = f"""
-You are a Python data analyst agemt.
-You are working with a Pandas DataFrame called `df`
 Here is information about the dataset:
+
 {info}
 
-The user askes: 
+The user asks:
+
 {question}
 
-Generate only the python code required to answer the user's question.
+Generate ONLY the Python code required to answer the user's question.
+
 Rules:
 - Use Pandas.
 - The DataFrame is already available as `df`.
@@ -50,59 +48,58 @@ Rules:
 - Do not explain the code.
 """
 
-interaction = client.interactions.create(
-    model="gemini-3.6-flash",
-    input=prompt,
-)
+    interaction = client.interactions.create(
+        model="gemini-3.6-flash",
+        input=prompt
+    )
 
-code = interaction.output_text.strip()
+    code = interaction.output_text.strip()
 
-#Error Recovery Loop
+    # Error recovery loop
+    MAX_ATTEMPTS = 3
 
-MAX_ATTEMPT = 3
+    for attempt in range(1, MAX_ATTEMPTS + 1):
 
-for attempt in range(1, MAX_ATTEMPT + 1):
+        execution = execute_analysis(df, code)
 
-    print(f"\n Attempt {attempt}")
-    print("Generated code:")
-    print(code)
+        if execution["success"]:
 
-    execution = execute_analysis(df, code)
+            result = execution["result"]
 
-    # Success
-    if execution["success"]:
-        result = execution["result"]
+            break
 
-        print("\nAnalysis Result:")
-        print(result)
+        # If this was the final attempt
+        if attempt == MAX_ATTEMPTS:
 
-        break
+            return {
+                "success": False,
+                "answer": "The agent could not complete the analysis.",
+                "code": code,
+                "error": execution["error"]
+            }
 
-    #Error 
-    print("\nExecution Error:")
-    print(execution["error"])
+        # Ask Gemini to fix the code
+        correction_prompt = f"""
+You are debugging Python Pandas code.
 
-    if attempt == MAX_ATTEMPT:
-        print("\n The agent could not complete the analysis.")
-
-        break
-
-    # Asking Gemini to fix the code
-    correction_prompt = f"""
-You are debuggin Python Pandas code.
 User question:
 
 {question}
 
 Dataset information:
+
 {info}
 
 Previous code:
+
 {code}
+
 The code produced this error:
+
 {execution["error"]}
 
 Fix the code so that it correctly answers the user's question.
+
 Rules:
 - Use Pandas.
 - The DataFrame is available as `df`.
@@ -111,24 +108,17 @@ Rules:
 - Do not use print().
 - Do not include markdown.
 - Do not include ```python.
-- Do not explain anything
+- Do not explain anything.
 """
 
+        correction = client.interactions.create(
+            model="gemini-3.6-flash",
+            input=correction_prompt
+        )
 
-    correction = client.interactions.create(
-        model="gemini-3.6-flash",
-        input=correction_prompt
-    )
+        code = correction.output_text.strip()
 
-    code = correction.output_text.strip()
-
-
-# -----------------------------
-# Generate final explanation
-# -----------------------------
-
-if execution["success"]:
-
+    # Ask Gemini to explain the result
     explanation_prompt = f"""
 You are a data analysis assistant.
 
@@ -155,5 +145,27 @@ Rules:
         input=explanation_prompt
     )
 
+    return {
+        "success": True,
+        "answer": explanation.output_text,
+        "result": result,
+        "code": code
+    }
+
+
+# Terminal testing
+if __name__ == "__main__":
+
+    df = load_data("data/sales.csv")
+
+    print("Dataset loaded successfully!")
+
+    print("\nDataset information:")
+    print(get_dataset_info(df))
+
+    question = input("\nWhat would you like to know about the dataset? ")
+
+    response = analyze_question(df, question)
+
     print("\nAgent answer:")
-    print(explanation.output_text)
+    print(response["answer"])
