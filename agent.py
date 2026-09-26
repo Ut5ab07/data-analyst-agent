@@ -90,6 +90,11 @@ Rules:
 - Use Pandas.
 - The DataFrame is already available as `df`.
 - Store the final answer in a variable called `result`.
+- `pd` and `plt` are already available.
+- If the question involves a comparison, ranking, distribution, trend, or explicitly asks for a chart/plot, create an appropriate visualization using Matplotlib.
+- Store the Matplotlib figure in a variable called `fig`.
+- If a visualization is not useful or not requested, set `fig = None`.
+- Do not use plt.show().
 - Do not use print().
 - Do not use markdown.
 - Do not include ```python.
@@ -117,6 +122,7 @@ Rules:
         if execution["success"]:
 
             result = execution["result"]
+            figure = execution["figure"]
 
             break
 
@@ -127,6 +133,7 @@ Rules:
                 "success": False,
                 "answer": "The agent could not complete the analysis.",
                 "code": code,
+                "figure": None,
                 "error": execution["error"]
             }
 
@@ -155,7 +162,11 @@ Fix the code so that it correctly answers the user's question.
 Rules:
 - Use Pandas.
 - The DataFrame is available as `df`.
+- `pd` and `plt` are already available.
 - Store the final answer in a variable called `result`.
+- If the original question requires or benefits from a visualization, create it and store it in `fig`.
+- Otherwise set `fig = None`.
+- Do not use plt.show().
 - Return ONLY the corrected Python code.
 - Do not use print().
 - Do not include markdown.
@@ -210,6 +221,7 @@ Rules:
         "success": True,
         "answer": explanation["text"],
         "result": result,
+        "figure": figure,
         "code": code
     }
 

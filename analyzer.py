@@ -1,4 +1,5 @@
 import pandas as pd
+import matplotlib.pyplot as plt
 
 def load_data(file_path):
     df = pd.read_csv(file_path)
@@ -15,17 +16,20 @@ def get_dataset_info(df):
 def execute_analysis(df, code):
     local_variables = {
         "df": df,
-        "pd": pd
+        "pd": pd,
+        "plt": plt
     }
 
     try:
         exec(code, {}, local_variables)
 
         result = local_variables.get("result")
+        figure = local_variables.get("fig")
 
         return {
             "success":True,
             "result": result,
+            "figure": figure,
             "error": None
         }
 
@@ -33,6 +37,7 @@ def execute_analysis(df, code):
         return {
             "success": False,
             "result": None,
+            "figure": None,
             "error": str(e)
         }
 

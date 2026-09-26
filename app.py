@@ -139,6 +139,16 @@ if uploaded_file is not None:
 
                 st.write(response["result"])
 
+                # Display visualization if one was generated
+                if response.get("figure") is not None:
+
+                    st.subheader("Visualization")
+
+                    st.pyplot(
+                        response["figure"],
+                        use_container_width=True
+                    )
+
                 # Generated code stays inside dropdown
                 with st.expander("View Generated Code"):
                     st.code(
